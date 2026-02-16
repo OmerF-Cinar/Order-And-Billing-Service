@@ -20,8 +20,6 @@ public class Product {
     @Column(name = "price")
     private long price;
 
-
-
     //Constructor
     public Product() {}
 
