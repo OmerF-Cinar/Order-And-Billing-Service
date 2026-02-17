@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import com.webtech.ordernbilling.entity.Product;
 
 @Entity
+@Table
 public class OrderItem {
 
     @Id
@@ -16,7 +17,7 @@ public class OrderItem {
     private Product product;
 
     @ManyToOne
-    @JoinColumn(name = "order_id", nullable = false)
+    @JoinColumn(name = "order_id")
     private Order order;
 
     @Column(name = "quantity")
@@ -25,7 +26,7 @@ public class OrderItem {
     @Column(name = "price_at_purchase")
     private long priceAtPurchase;
 
-    protected OrderItem() {}
+    public OrderItem() {}
 
     public OrderItem(Product product, Order order, int quantity, long priceAtPurchase) {
         this.product = product;
