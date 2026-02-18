@@ -18,13 +18,10 @@ public class UserService {
 
     private static int MIN_PASSWORD_LENGTH = 8;
     private static Logger logger = LoggerFactory.getLogger(UserService.class);
-    private FileWriter myWriter = new FileWriter("logging.txt", true);
 
     @Autowired
     private UserRepository userRepository;
 
-    public UserService() throws IOException {
-    }
 
     public User createUser(User user) {
         if(user.getUsername() == null || user.getUsername().isBlank()) {
@@ -108,5 +105,11 @@ public class UserService {
 
         return user;
     }
+
+//    public Optional<User> addFriend(int id, int friendId) {
+//        Optional<User> user = userRepository.findById(id);
+//
+//        Optional<User> friend = userRepository.findById(friendId);
+//    }
 
 }

@@ -2,6 +2,10 @@ package com.webtech.ordernbilling.entity;
 
 import jakarta.persistence.*;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 @Entity
 @Table(name = "users")
 public class User {
@@ -24,6 +28,14 @@ public class User {
 
     @Column(name = "accountBalance")
     private long accountBalance;
+
+    @OneToMany
+    @Column(name = "friends")
+    private List<User> friends = new ArrayList<>();
+
+    @OneToMany
+    @Column(name = "favourites")
+    private List<Product> favourites;
 
     //Constructor
     public User() {}
@@ -76,16 +88,20 @@ public class User {
         this.accountBalance = accountBalance;
     }
 
-    //toString
-
-    @Override
-    public String toString() {
-        return "User{" +
-                "id=" + id +
-                ", username='" + username + '\'' +
-                ", password='" + password + '\'' +
-                ", email='" + email + '\'' +
-                ", accountBalance=" + accountBalance +
-                '}';
+    public List<User> getFriends() {
+        return friends;
     }
+
+    public void setFriends(List<User> friends) {
+        this.friends = friends;
+    }
+
+    public List<Product> getFavourites() {
+        return favourites;
+    }
+
+    public void setFavourites(List<Product> favourites) {
+        this.favourites = favourites;
+    }
+
 }

@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order & Billing — Demo Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0a0a; color: #f0f0f0; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
+    select option { background: #111; }
+    @keyframes slideIn {
+      from { transform: translateY(16px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .panel { animation: fadeIn 0.2s ease; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const fetchAPI = async (method, path, body) => {
+      const res = await fetch(path, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `HTTP ${res.status}`);
+      }
+      return res.json().catch(() => null);
+    };
+
+    const STEPS = [
+      { id: "users",    label: "01 — Users",    icon: "◈" },
+      { id: "products", label: "02 — Products",  icon: "◉" },
+      { id: "orders",   label: "03 — Orders",    icon: "◆" },
+      { id: "balance",  label: "04 — Balance",   icon: "◇" },
+    ];
+
+    function Toast({ message, type, onClose }) {
+      useEffect(() => {
+        const t = setTimeout(onClose, 3500);
+        return () => clearTimeout(t);
+      }, []);
+      return (
+        <div style={{
+          position: "fixed", bottom: 32, right: 32,
+          background: type === "error" ? "#ff3b30" : "#00e676",
+          color: type === "error" ? "#fff" : "#0a0a0a",
+          padding: "12px 20px",
+          fontFamily: "'DM Mono', monospace", fontSize: 13, letterSpacing: "0.03em",
+          borderRadius: 4, zIndex: 9999, maxWidth: 360,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          animation: "slideIn 0.2s ease",
+        }}>
+          {message}
+        </div>
+      );
+    }
+
+    const inputStyle = {
+      width: "100%", background: "#111", border: "1px solid #2a2a2a",
+      borderRadius: 3, padding: "9px 12px", color: "#f0f0f0",
+      fontFamily: "'DM Mono', monospace", fontSize: 13, outline: "none",
+      boxSizing: "border-box",
+    };
+
+    const labelStyle = {
+      display: "block", fontFamily: "'DM Mono', monospace", fontSize: 10,
+      letterSpacing: "0.12em", textTransform: "uppercase", color: "#888", marginBottom: 6,
+    };
+
+    function Field({ label, value, onChange, type = "text", placeholder }) {
+      return (
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>{label}</label>
+          <input
+            type={type} value={value} placeholder={placeholder}
+            onChange={e => onChange(e.target.value)}
+            style={inputStyle}
+            onFocus={e => e.target.style.borderColor = "#00e676"}
+            onBlur={e => e.target.style.borderColor = "#2a2a2a"}
+          />
+        </div>
+      );
+    }
+
+    function SelectField({ label, value, onChange, children }) {
+      return (
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>{label}</label>
+          <select value={value} onChange={e => onChange(e.target.value)}
+            style={{ ...inputStyle, color: value ? "#f0f0f0" : "#555" }}>
+            {children}
+          </select>
+        </div>
+      );
+    }
+
+    function Btn({ children, onClick, loading, variant = "primary", small }) {
+      const variants = {
+        primary: { background: "#00e676", color: "#0a0a0a" },
+        danger:  { background: "#ff3b30", color: "#fff" },
+        ghost:   { background: "transparent", color: "#888", border: "1px solid #2a2a2a" },
+      };
+      return (
+        <button
+          onClick={onClick} disabled={loading}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: small ? "7px 14px" : "10px 20px",
+            fontFamily: "'DM Mono', monospace",
+            fontSize: small ? 11 : 12, letterSpacing: "0.08em",
+            textTransform: "uppercase", border: "none", borderRadius: 3,
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.6 : 1, transition: "opacity 0.15s",
+            ...variants[variant],
+          }}
+          onMouseEnter={e => { if (!loading) e.currentTarget.style.opacity = "0.8"; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+        >
+          {loading ? "..." : children}
+        </button>
+      );
+    }
+
+    function Card({ children, style }) {
+      return (
+        <div style={{
+          background: "#111", border: "1px solid #1e1e1e",
+          borderRadius: 6, padding: 20, ...style,
+        }}>
+          {children}
+        </div>
+      );
+    }
+
+    function Badge({ text, color = "#00e676" }) {
+      return (
+        <span style={{
+          background: color + "22", color,
+          border: `1px solid ${color}44`,
+          padding: "2px 8px", borderRadius: 3,
+          fontSize: 10, fontFamily: "'DM Mono', monospace",
+          letterSpacing: "0.08em", textTransform: "uppercase",
+        }}>
+          {text}
+        </span>
+      );
+    }
+
+    function SectionTitle({ children }) {
+      return (
+        <div style={{
+          fontFamily: "'DM Mono', monospace", fontSize: 10,
+          letterSpacing: "0.15em", textTransform: "uppercase",
+          color: "#555", marginBottom: 18, paddingBottom: 10,
+          borderBottom: "1px solid #1a1a1a",
+        }}>
+          {children}
+        </div>
+      );
+    }
+
+    function EmptyState({ text }) {
+      return (
+        <div style={{
+          textAlign: "center", padding: "32px 0",
+          fontFamily: "'DM Mono', monospace", fontSize: 12,
+          color: "#333", letterSpacing: "0.05em",
+        }}>
+          {text}
+        </div>
+      );
+    }
+
+    function UserRow({ u }) {
+      return (
+        <div style={{
+          background: "#0d0d0d", border: "1px solid #1e1e1e",
+          borderRadius: 4, padding: "12px 14px",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <div>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#f0f0f0", marginBottom: 3 }}>
+              <span style={{ color: "#555", marginRight: 8 }}>#{u.id}</span>{u.username}
+            </div>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#555" }}>{u.email}</div>
+          </div>
+          <Badge text={`$${u.accountBalance}`} color="#00e676" />
+        </div>
+      );
+    }
+
+    // ─── USERS PANEL ─────────────────────────────────────────────────────────────
+    function UsersPanel({ toast }) {
+      const [users, setUsers] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [form, setForm] = useState({ username: "", password: "", email: "", accountBalance: "" });
+
+      const load = () => fetchAPI("GET", "/user/all").then(d => setUsers(d || [])).catch(e => toast(e.message, "error"));
+      useEffect(() => { load(); }, []);
+
+      const create = async () => {
+        setLoading(true);
+        try {
+          await fetchAPI("POST", "/user/add", {
+            username: form.username, password: form.password,
+            email: form.email, accountBalance: Number(form.accountBalance),
+          });
+          toast(`User "${form.username}" created ✓`);
+          setForm({ username: "", password: "", email: "", accountBalance: "" });
+          load();
+        } catch(e) { toast(e.message, "error"); }
+        setLoading(false);
+      };
+
+      return (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <Card>
+            <SectionTitle>Create User</SectionTitle>
+            <Field label="Username" value={form.username} onChange={v => setForm({...form, username: v})} placeholder="e.g. alice" />
+            <Field label="Password (min 8 chars)" value={form.password} onChange={v => setForm({...form, password: v})} type="password" placeholder="••••••••" />
+            <Field label="Email" value={form.email} onChange={v => setForm({...form, email: v})} placeholder="alice@example.com" />
+            <Field label="Starting Balance ($)" value={form.accountBalance} onChange={v => setForm({...form, accountBalance: v})} type="number" placeholder="1000" />
+            <Btn onClick={create} loading={loading}>+ Create User</Btn>
+          </Card>
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <SectionTitle>All Users</SectionTitle>
+              <Btn onClick={load} variant="ghost" small>↻ Refresh</Btn>
+            </div>
+            {users.length === 0 ? <EmptyState text="No users yet" /> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {users.map(u => <UserRow key={u.id} u={u} />)}
+              </div>
+            )}
+          </Card>
+        </div>
+      );
+    }
+
+    // ─── PRODUCTS PANEL ──────────────────────────────────────────────────────────
+    function ProductsPanel({ toast }) {
+      const [products, setProducts] = useState([]);
+      const [loading, setLoading] = useState(false);
+      const [form, setForm] = useState({ name: "", amount: "", price: "" });
+      const [editId, setEditId] = useState(null);
+      const [editPrice, setEditPrice] = useState("");
+
+      const load = () => fetchAPI("GET", "/product/all").then(d => setProducts(d || [])).catch(e => toast(e.message, "error"));
+      useEffect(() => { load(); }, []);
+
+      const create = async () => {
+        setLoading(true);
+        try {
+          await fetchAPI("POST", "/product/add", { name: form.name, amount: Number(form.amount), price: Number(form.price) });
+          toast(`Product "${form.name}" added ✓`);
+          setForm({ name: "", amount: "", price: "" });
+          load();
+        } catch(e) { toast(e.message, "error"); }
+        setLoading(false);
+      };
+
+      const updatePrice = async (id) => {
+        try {
+          await fetchAPI("PUT", `/product/${id}/updateprice/${editPrice}`);
+          toast("Price updated ✓");
+          setEditId(null); setEditPrice(""); load();
+        } catch(e) { toast(e.message, "error"); }
+      };
+
+      const deleteProduct = async (id) => {
+        try {
+          await fetchAPI("DELETE", `/product/delete/${id}`);
+          toast("Product deleted ✓"); load();
+        } catch(e) { toast(e.message, "error"); }
+      };
+
+      return (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 20 }}>
+          <Card>
+            <SectionTitle>Add Product</SectionTitle>
+            <Field label="Product Name" value={form.name} onChange={v => setForm({...form, name: v})} placeholder="e.g. Keyboard" />
+            <Field label="Stock Quantity" value={form.amount} onChange={v => setForm({...form, amount: v})} type="number" placeholder="10" />
+            <Field label="Price ($)" value={form.price} onChange={v => setForm({...form, price: v})} type="number" placeholder="150" />
+            <Btn onClick={create} loading={loading}>+ Add Product</Btn>
+          </Card>
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <SectionTitle>Product Catalog</SectionTitle>
+              <Btn onClick={load} variant="ghost" small>↻ Refresh</Btn>
+            </div>
+            {products.length === 0 ? <EmptyState text="No products yet" /> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {products.map(p => (
+                  <div key={p.id} style={{ background: "#0d0d0d", border: "1px solid #1e1e1e", borderRadius: 4, padding: "10px 14px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <span style={{ color: "#555", fontFamily: "'DM Mono', monospace", fontSize: 11, marginRight: 8 }}>#{p.id}</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#f0f0f0" }}>{p.name}</span>
+                        <span style={{ color: "#555", fontFamily: "'DM Mono', monospace", fontSize: 11, marginLeft: 10 }}>qty:{p.amount}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Badge text={`$${p.price}`} color="#f5a623" />
+                        <Btn onClick={() => { setEditId(p.id); setEditPrice(String(p.price)); }} variant="ghost" small>Edit</Btn>
+                        <Btn onClick={() => deleteProduct(p.id)} variant="danger" small>✕</Btn>
+                      </div>
+                    </div>
+                    {editId === p.id && (
+                      <div style={{ marginTop: 10, display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="number" value={editPrice}
+                          onChange={e => setEditPrice(e.target.value)}
+                          style={{ ...inputStyle, width: 120, border: "1px solid #00e676" }}
+                        />
+                        <Btn onClick={() => updatePrice(p.id)} small>Save</Btn>
+                        <Btn onClick={() => setEditId(null)} variant="ghost" small>Cancel</Btn>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      );
+    }
+
+    // ─── ORDERS PANEL ────────────────────────────────────────────────────────────
+    function OrdersPanel({ toast }) {
+      const [users, setUsers] = useState([]);
+      const [products, setProducts] = useState([]);
+      const [userId, setUserId] = useState("");
+      const [items, setItems] = useState([{ productId: "", quantity: "" }]);
+      const [loading, setLoading] = useState(false);
+      const [lastOrder, setLastOrder] = useState(null);
+
+      useEffect(() => {
+        fetchAPI("GET", "/user/all").then(d => setUsers(d || [])).catch(() => {});
+        fetchAPI("GET", "/product/all").then(d => setProducts(d || [])).catch(() => {});
+      }, []);
+
+      const addItem = () => setItems([...items, { productId: "", quantity: "" }]);
+      const removeItem = i => setItems(items.filter((_, idx) => idx !== i));
+      const updateItem = (i, field, val) => {
+        const updated = [...items];
+        updated[i][field] = val;
+        setItems(updated);
+      };
+
+      const placeOrder = async () => {
+        if (!userId) return toast("Select a user", "error");
+        const valid = items.filter(i => i.productId && i.quantity);
+        if (!valid.length) return toast("Add at least one item", "error");
+        setLoading(true);
+        try {
+          const order = await fetchAPI("POST", `/order/add/${userId}`, {
+            items: valid.map(i => ({ productId: Number(i.productId), quantity: Number(i.quantity) })),
+          });
+          toast(`Order #${order?.id} placed ✓`);
+          setLastOrder(order);
+          setItems([{ productId: "", quantity: "" }]);
+          // refresh users to show updated balance
+          fetchAPI("GET", "/user/all").then(d => setUsers(d || [])).catch(() => {});
+        } catch(e) { toast(e.message, "error"); }
+        setLoading(false);
+      };
+
+      const selectedUser = users.find(u => u.id === Number(userId));
+      const estimatedTotal = items.reduce((sum, item) => {
+        const p = products.find(pr => pr.id === Number(item.productId));
+        return sum + (p ? p.price * (Number(item.quantity) || 0) : 0);
+      }, 0);
+
+      return (
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20 }}>
+          <Card>
+            <SectionTitle>Place Order</SectionTitle>
+            <SelectField label="Select User" value={userId} onChange={setUserId}>
+              <option value="">-- choose user --</option>
+              {users.map(u => <option key={u.id} value={u.id}>#{u.id} {u.username} (${u.accountBalance})</option>)}
+            </SelectField>
+
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Order Items</label>
+              {items.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "center" }}>
+                  <select
+                    value={item.productId} onChange={e => updateItem(i, "productId", e.target.value)}
+                    style={{ flex: 2, ...inputStyle, color: item.productId ? "#f0f0f0" : "#555" }}
+                  >
+                    <option value="">-- product --</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name} (${p.price})</option>)}
+                  </select>
+                  <input
+                    type="number" value={item.quantity} placeholder="qty" min={1}
+                    onChange={e => updateItem(i, "quantity", e.target.value)}
+                    style={{ flex: 1, ...inputStyle }}
+                  />
+                  {items.length > 1 && (
+                    <button onClick={() => removeItem(i)} style={{
+                      background: "transparent", border: "1px solid #2a2a2a",
+                      borderRadius: 3, color: "#ff3b30", cursor: "pointer",
+                      padding: "8px 10px", fontFamily: "'DM Mono', monospace", fontSize: 12,
+                    }}>✕</button>
+                  )}
+                </div>
+              ))}
+              <Btn onClick={addItem} variant="ghost" small>+ Add Item</Btn>
+            </div>
+
+            <div style={{ borderTop: "1px solid #1e1e1e", paddingTop: 14, marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#888", marginBottom: 4 }}>
+                <span>Estimated Total</span>
+                <span style={{ color: estimatedTotal > 0 ? "#f5a623" : "#555" }}>${estimatedTotal}</span>
+              </div>
+              {selectedUser && (
+                <div style={{ display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#888" }}>
+                  <span>User Balance</span>
+                  <span style={{ color: selectedUser.accountBalance >= estimatedTotal ? "#00e676" : "#ff3b30" }}>
+                    ${selectedUser.accountBalance}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <Btn onClick={placeOrder} loading={loading}>Place Order →</Btn>
+          </Card>
+
+          <Card>
+            <SectionTitle>Last Order Result</SectionTitle>
+            {!lastOrder ? <EmptyState text="No order placed yet" /> : (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 22, color: "#f0f0f0" }}>
+                    Order #{lastOrder.id}
+                  </span>
+                  <Badge text={lastOrder.status || "PENDING"} color="#f5a623" />
+                </div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#888", marginBottom: 16 }}>
+                  Total: <span style={{ color: "#00e676", fontSize: 18 }}>${lastOrder.orderTotal}</span>
+                </div>
+                {lastOrder.items && lastOrder.items.length > 0 && (
+                  <div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, letterSpacing: "0.1em", color: "#444", textTransform: "uppercase", marginBottom: 8 }}>Items</div>
+                    {lastOrder.items.map((item, i) => (
+                      <div key={i} style={{
+                        display: "flex", justifyContent: "space-between",
+                        fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#888",
+                        padding: "6px 0", borderBottom: "1px solid #1a1a1a",
+                      }}>
+                        <span>{item.product?.name || `Product #${item.product?.id}`} × {item.quantity}</span>
+                        <span>${item.priceAtPurchase}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      );
+    }
+
+    // ─── BALANCE PANEL ───────────────────────────────────────────────────────────
+    function BalancePanel({ toast }) {
+      const [users, setUsers] = useState([]);
+      const [userId, setUserId] = useState("");
+      const [amount, setAmount] = useState("");
+      const [loading, setLoading] = useState(false);
+
+      const load = () => fetchAPI("GET", "/user/all").then(d => setUsers(d || [])).catch(e => toast(e.message, "error"));
+      useEffect(() => { load(); }, []);
+
+      const deposit = async () => {
+        if (!userId || !amount) return toast("Select user and enter amount", "error");
+        setLoading(true);
+        try {
+          await fetchAPI("PUT", `/user/${userId}/addbalance/${amount}`);
+          toast(`+$${amount} deposited ✓`);
+          setAmount(""); load();
+        } catch(e) { toast(e.message, "error"); }
+        setLoading(false);
+      };
+
+      const withdraw = async () => {
+        if (!userId || !amount) return toast("Select user and enter amount", "error");
+        setLoading(true);
+        try {
+          await fetchAPI("PUT", `/user/${userId}/deletebalance/${amount}`);
+          toast(`-$${amount} withdrawn ✓`);
+          setAmount(""); load();
+        } catch(e) { toast(e.message, "error"); }
+        setLoading(false);
+      };
+
+      const selected = users.find(u => u.id === Number(userId));
+
+      return (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <Card>
+            <SectionTitle>Manage Balance</SectionTitle>
+            <SelectField label="Select User" value={userId} onChange={setUserId}>
+              <option value="">-- choose user --</option>
+              {users.map(u => <option key={u.id} value={u.id}>#{u.id} {u.username}</option>)}
+            </SelectField>
+
+            {selected && (
+              <div style={{
+                background: "#0d0d0d", border: "1px solid #1e1e1e",
+                borderRadius: 4, padding: "12px 16px", marginBottom: 14,
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 12, color: "#888" }}>Current Balance</span>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 24, color: "#00e676" }}>
+                  ${selected.accountBalance}
+                </span>
+              </div>
+            )}
+
+            <Field label="Amount ($)" value={amount} onChange={setAmount} type="number" placeholder="e.g. 500" />
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn onClick={deposit} loading={loading}>+ Deposit</Btn>
+              <Btn onClick={withdraw} loading={loading} variant="danger">− Withdraw</Btn>
+            </div>
+          </Card>
+
+          <Card>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <SectionTitle>User Balances</SectionTitle>
+              <Btn onClick={load} variant="ghost" small>↻ Refresh</Btn>
+            </div>
+            {users.length === 0 ? <EmptyState text="No users" /> : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {users.map(u => (
+                  <div key={u.id} style={{
+                    background: u.id === Number(userId) ? "#0f1a12" : "#0d0d0d",
+                    border: `1px solid ${u.id === Number(userId) ? "#00e67633" : "#1e1e1e"}`,
+                    borderRadius: 4, padding: "10px 14px",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    cursor: "pointer", transition: "all 0.15s",
+                  }} onClick={() => setUserId(String(u.id))}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 13, color: "#ccc" }}>
+                      <span style={{ color: "#444", marginRight: 8 }}>#{u.id}</span>{u.username}
+                    </span>
+                    <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 16, color: u.accountBalance > 0 ? "#00e676" : "#ff3b30" }}>
+                      ${u.accountBalance}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      );
+    }
+
+    // ─── ROOT APP ────────────────────────────────────────────────────────────────
+    function App() {
+      const [active, setActive] = useState("users");
+      const [toastData, setToastData] = useState(null);
+
+      const showToast = (message, type = "success") => setToastData({ message, type, key: Date.now() });
+
+      const panels = {
+        users:    <UsersPanel    toast={showToast} />,
+        products: <ProductsPanel toast={showToast} />,
+        orders:   <OrdersPanel   toast={showToast} />,
+        balance:  <BalancePanel  toast={showToast} />,
+      };
+
+      return (
+        <div style={{ minHeight: "100vh", background: "#0a0a0a" }}>
+          {/* Header */}
+          <div style={{
+            borderBottom: "1px solid #161616", padding: "0 40px",
+            display: "flex", alignItems: "center", justifyContent: "space-between", height: 60,
+          }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18, color: "#f0f0f0", letterSpacing: "-0.02em" }}>
+                ORDER<span style={{ color: "#00e676" }}>&amp;</span>BILLING
+              </span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 10, color: "#444", letterSpacing: "0.1em" }}>
+                DEMO CONSOLE
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#00e676", boxShadow: "0 0 8px #00e676" }} />
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: 11, color: "#555" }}>localhost:8080</span>
+            </div>
+          </div>
+
+          {/* Nav */}
+          <div style={{ borderBottom: "1px solid #161616", padding: "0 40px", display: "flex" }}>
+            {STEPS.map(step => (
+              <button key={step.id} onClick={() => setActive(step.id)} style={{
+                background: "transparent", border: "none",
+                borderBottom: active === step.id ? "2px solid #00e676" : "2px solid transparent",
+                padding: "14px 20px",
+                fontFamily: "'DM Mono', monospace", fontSize: 11,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                color: active === step.id ? "#f0f0f0" : "#444",
+                cursor: "pointer", transition: "all 0.15s", marginBottom: -1,
+              }}>
+                <span style={{ marginRight: 8, color: active === step.id ? "#00e676" : "#333" }}>{step.icon}</span>
+                {step.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Panel */}
+          <div className="panel" style={{ padding: "28px 40px", maxWidth: 1100 }}>
+            {panels[active]}
+          </div>
+
+          {toastData && (
+            <Toast key={toastData.key} message={toastData.message} type={toastData.type} onClose={() => setToastData(null)} />
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

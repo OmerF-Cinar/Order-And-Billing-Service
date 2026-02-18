@@ -28,7 +28,7 @@ public class OrderService {
     private UserService userService;
 
     @Autowired
-    private ProductRepository productRepository;
+    private ProductService productService;
 
     public Order createOrder(Integer id, CreateOrderRequestDTO requestDTO) {
         User reqUser = userService.getUserById(id)
@@ -41,8 +41,12 @@ public class OrderService {
         List<OrderItem> orderItems = requestDTO.getItems().stream()
                 .map(itemDTO -> {
 
-                    Product product = productRepository.findById(itemDTO.getProductId())
+                    Product product = productService.getProductById(itemDTO.getProductId())
                             .orElseThrow(() -> new RuntimeException("Product was not found."));
+
+                    if(itemDTO.getQuantity() <= 0) {
+                        throw new RuntimeException("Order quantity can't be equal to or less than 0.");
+                    }
 
                     OrderItem orderItem = new OrderItem();
                     orderItem.setProduct(product);
@@ -67,4 +71,15 @@ public class OrderService {
 
         return orderRepository.save(order);
     }
+
+
+    //IN WORKS FOR NOW
+
+//    public List<Order> getOrdersByUser(Integer id) {
+//
+//        User reqUser = userService.getUserById(id)
+//                .orElseThrow(() -> new RuntimeException("User was not found."));
+//
+//        List<Order> orders =
+//    }
 }
