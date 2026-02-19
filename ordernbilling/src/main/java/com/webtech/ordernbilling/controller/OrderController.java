@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/order")
 public class OrderController {
@@ -20,5 +22,10 @@ public class OrderController {
     @PostMapping(path="/add/{userId}")
     public Order createOrder(@PathVariable Integer userId, @RequestBody CreateOrderRequestDTO requestDTO) {
         return orderService.createOrder(userId, requestDTO);
+    }
+
+    @GetMapping(path="/findbyuser/{userid}")
+    public List<Order> findOrdersByUser(@PathVariable Integer userid) {
+        return orderService.getOrdersByUser(userid);
     }
 }

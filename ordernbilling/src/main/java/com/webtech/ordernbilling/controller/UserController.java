@@ -63,9 +63,23 @@ public class UserController {
         return reqUser.orElse(null);
     }
 
+    @PutMapping(path="/delete/{id}")
     public ResponseEntity<String> deleteUser(@PathVariable Integer id) {
         userService.deleteUser(id);
         return ResponseEntity.ok("User has been deleted successfully");
     }
+    
+    @PutMapping(path="{id}/addfriend/{friendId}")
+    public Optional<User> addFriend(@PathVariable Integer id, @PathVariable Integer friendId) {
+        userService.addFriend(id,friendId);
+        return userService.getUserById(id);
+    }
+
+    @PutMapping(path="/{id}/addfavourite/{productId}")
+    public Optional<User> addFavourite(@PathVariable Integer id, @PathVariable Integer productId) {
+        userService.addFavourite(id,productId);
+        return userService.getUserById(id);
+    }
+
 
 }

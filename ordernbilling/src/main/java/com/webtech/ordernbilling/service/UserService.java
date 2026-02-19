@@ -1,5 +1,7 @@
 package com.webtech.ordernbilling.service;
 
+import com.webtech.ordernbilling.entity.Product;
+import com.webtech.ordernbilling.repository.ProductRepository;
 import com.webtech.ordernbilling.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,9 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.webtech.ordernbilling.entity.User;
-
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +20,9 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
 
 
     public User createUser(User user) {
@@ -107,9 +109,48 @@ public class UserService {
     }
 
 //    public Optional<User> addFriend(int id, int friendId) {
-//        Optional<User> user = userRepository.findById(id);
+//        Optional<User> userOpt = userRepository.findById(id);
+//        Optional<User> friendOpt = userRepository.findById(friendId);
 //
-//        Optional<User> friend = userRepository.findById(friendId);
+//        if (userOpt.isPresent() && friendOpt.isPresent()) {
+//            User user = userOpt.get();
+//            User friend = friendOpt.get();
+//            user.getFriends().add(friend);
+//            userRepository.save(user);
+//            return Optional.of(user);
+//        }
+//
+//        return Optional.empty();
 //    }
+
+    public Optional<User> addFriend(int id, int friendId) {
+        Optional<User> userOptional = userRepository.findById(id);
+        Optional<User> friendOptional = userRepository.findById(friendId);
+
+        if(userOptional.isPresent() && friendOptional.isPresent()) {
+            User user = userOptional.get();
+            User friend = friendOptional.get();
+            user.getFriends().add(friend);
+            userRepository.save(user);
+            return Optional.of(user);
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<User> addFavourite(int id, int productId) {
+        Optional<User> userOptional = userRepository.findById(id);
+        Optional<Product> productOptional = productRepository.findById(productId);
+
+        if(userOptional.isPresent() && productOptional.isPresent()) {
+            User user = userOptional.get();
+            Product product = productOptional.get();
+            user.getFavourites().add(product);
+            userRepository.save(user);
+            return Optional.of(user);
+        }
+
+        return Optional.empty();
+    }
 
 }

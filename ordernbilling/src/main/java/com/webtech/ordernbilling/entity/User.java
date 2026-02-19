@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @Entity
 @Table(name = "users")
@@ -29,13 +28,24 @@ public class User {
     @Column(name = "accountBalance")
     private long accountBalance;
 
-    @OneToMany
-    @Column(name = "friends")
+    @ManyToMany
+    @JoinTable(
+            name="user_friends",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "friend_id")
+    )
     private List<User> friends = new ArrayList<>();
 
-    @OneToMany
-    @Column(name = "favourites")
+    @ManyToMany
+    @JoinTable(
+            name="user_favourites",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "product_id")
+    )
     private List<Product> favourites;
+
+    @OneToMany
+    private List<Order> orders;
 
     //Constructor
     public User() {}
@@ -104,4 +114,11 @@ public class User {
         this.favourites = favourites;
     }
 
+    public List<Order> getOrders() {
+        return orders;
+    }
+
+    public void setOrders(List<Order> orders) {
+        this.orders = orders;
+    }
 }

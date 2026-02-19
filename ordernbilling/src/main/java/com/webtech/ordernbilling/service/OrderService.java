@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -72,14 +73,9 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
+    public List<Order> getOrdersByUser(Integer id) {
+        Optional<User> userOptional = userService.getUserById(id);
+        return orderRepository.findByUserId(id);
+    }
 
-    //IN WORKS FOR NOW
-
-//    public List<Order> getOrdersByUser(Integer id) {
-//
-//        User reqUser = userService.getUserById(id)
-//                .orElseThrow(() -> new RuntimeException("User was not found."));
-//
-//        List<Order> orders =
-//    }
 }
